@@ -1,15 +1,35 @@
 const userService = require('../services/user.service');
+const ApiError = require('../utils/apiError');
+const logger = require('../utils/logger');
 
 /**
  * Register a new user
  */
 const register = async (req, res, next) => {
   try {
-    // TODO: Implement user registration logic
+    const { email, password, name, phone } = req.body;
+
+    // Validation
+    if (!email || !password) {
+      throw ApiError.badRequest('Email and password are required');
+    }
+
+    if (password.length < 6) {
+      throw ApiError.badRequest('Password must be at least 6 characters');
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw ApiError.badRequest('Invalid email format');
+    }
+
+    const result = await userService.register({ email, password, name, phone });
+
     res.status(201).json({
       status: 'success',
-      message: 'User registration endpoint',
-      data: null
+      message: 'User registered successfully',
+      data: result
     });
   } catch (error) {
     next(error);
@@ -21,11 +41,19 @@ const register = async (req, res, next) => {
  */
 const login = async (req, res, next) => {
   try {
-    // TODO: Implement user login logic
+    const { email, password } = req.body;
+
+    // Validation
+    if (!email || !password) {
+      throw ApiError.badRequest('Email and password are required');
+    }
+
+    const result = await userService.login({ email, password });
+
     res.status(200).json({
       status: 'success',
-      message: 'User login endpoint',
-      data: null
+      message: 'Login successful',
+      data: result
     });
   } catch (error) {
     next(error);
@@ -37,11 +65,14 @@ const login = async (req, res, next) => {
  */
 const getProfile = async (req, res, next) => {
   try {
-    // TODO: Implement get profile logic
+    const userId = req.user.id;
+
+    const user = await userService.getProfile(userId);
+
     res.status(200).json({
       status: 'success',
-      message: 'Get user profile endpoint',
-      data: null
+      message: 'Profile retrieved successfully',
+      data: user
     });
   } catch (error) {
     next(error);
@@ -53,10 +84,42 @@ const getProfile = async (req, res, next) => {
  */
 const updateProfile = async (req, res, next) => {
   try {
-    // TODO: Implement update profile logic
+    const userId = req.user.id;
+    const { name, phone } = req.body;
+
+    const user = await userService.updateProfile(userId, { name, phone });
+
     res.status(200).json({
       status: 'success',
-      message: 'Update user profile endpoint',
+      message: 'Profile updated successfully',
+      data: user
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Change password
+ */
+const changePassword = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { oldPassword, newPassword } = req.body;
+
+    if (!oldPassword || !newPassword) {
+      throw ApiError.badRequest('Old password and new password are required');
+    }
+
+    if (newPassword.length < 6) {
+      throw ApiError.badRequest('New password must be at least 6 characters');
+    }
+
+    const result = await userService.changePassword(userId, oldPassword, newPassword);
+
+    res.status(200).json({
+      status: 'success',
+      message: result.message,
       data: null
     });
   } catch (error) {
@@ -70,11 +133,13 @@ const updateProfile = async (req, res, next) => {
 const deleteUser = async (req, res, next) => {
   try {
     const { id } = req.params;
-    // TODO: Implement delete user logic
+
+    await userService.deleteUser(id);
+
     res.status(200).json({
       status: 'success',
-      message: 'Delete user endpoint',
-      data: { id }
+      message: 'User deleted successfully',
+      data: null
     });
   } catch (error) {
     next(error);
@@ -86,6 +151,7 @@ module.exports = {
   login,
   getProfile,
   updateProfile,
+  changePassword,
   deleteUser
 };
 

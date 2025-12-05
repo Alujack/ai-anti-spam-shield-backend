@@ -24,12 +24,15 @@ const scanText = async (req, res, next) => {
 
     logger.info('Scanning text for spam', { messageLength: message.length });
 
-    // Call AI service to analyze message
-    const result = await messageService.scanTextForSpam(message);
+    // Get userId if user is authenticated (optional)
+    const userId = req.user?.id || null;
 
-    logger.info('Spam scan completed', {
+    // Call AI service to analyze message
+    const result = await messageService.scanTextForSpam(message, userId);
+
+    logger.info('Spam scan completed', { 
       isSpam: result.is_spam,
-      confidence: result.confidence
+      confidence: result.confidence 
     });
 
     res.status(200).json({
@@ -39,6 +42,85 @@ const scanText = async (req, res, next) => {
     });
   } catch (error) {
     logger.error('Error scanning text', { error: error.message });
+    next(error);
+  }
+};
+
+/**
+ * Get scan history
+ */
+const getScanHistory = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { page, limit, isSpam } = req.query;
+
+    const result = await messageService.getScanHistory(userId, { page, limit, isSpam });
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Scan history retrieved successfully',
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get scan history by ID
+ */
+const getScanHistoryById = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+
+    const history = await messageService.getScanHistoryById(id, userId);
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Scan history retrieved successfully',
+      data: history
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Delete scan history
+ */
+const deleteScanHistory = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+
+    const result = await messageService.deleteScanHistory(id, userId);
+
+    res.status(200).json({
+      status: 'success',
+      message: result.message,
+      data: null
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get scan statistics
+ */
+const getScanStatistics = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    const stats = await messageService.getScanStatistics(userId);
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Statistics retrieved successfully',
+      data: stats
+    });
+  } catch (error) {
     next(error);
   }
 };
@@ -111,6 +193,10 @@ const deleteMessage = async (req, res, next) => {
 
 module.exports = {
   scanText,
+  getScanHistory,
+  getScanHistoryById,
+  deleteScanHistory,
+  getScanStatistics,
   analyzeMessage,
   getAllMessages,
   getMessageById,

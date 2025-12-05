@@ -1,5 +1,6 @@
 const axios = require('axios');
 const config = require('../config');
+const prisma = require('../config/database');
 const ApiError = require('../utils/apiError');
 const logger = require('../utils/logger');
 
@@ -12,9 +13,10 @@ class MessageService {
   /**
    * Scan text for spam using AI model service
    * @param {string} messageText - The message text to scan
+   * @param {string} userId - Optional user ID to save history
    * @returns {Promise<Object>} - Spam detection result
    */
-  async scanTextForSpam(messageText) {
+  async scanTextForSpam(messageText, userId = null) {
     try {
       const aiServiceUrl = `${config.ai.serviceUrl}/predict`;
       
@@ -42,7 +44,7 @@ class MessageService {
         status: response.status 
       });
 
-      return {
+      const result = {
         is_spam: response.data.is_spam || response.data.prediction === 'spam',
         confidence: response.data.confidence || response.data.probability || 0,
         prediction: response.data.prediction || (response.data.is_spam ? 'spam' : 'ham'),
@@ -51,10 +53,16 @@ class MessageService {
         ...(response.data.details && { details: response.data.details })
       };
 
+      // Save to history if user is authenticated
+      if (userId) {
+        await this.saveScanHistory(userId, messageText, result);
+      }
+
+      return result;
+
     } catch (error) {
       // Handle different types of errors
       if (error.isOperational) {
-        // Re-throw operational errors (ApiError instances)
         throw error;
       }
 
@@ -71,7 +79,6 @@ class MessageService {
       }
 
       if (error.response) {
-        // The AI service responded with an error status
         logger.error('AI service error response', { 
           status: error.response.status,
           data: error.response.data 
@@ -91,13 +98,130 @@ class MessageService {
         }
       }
 
-      // Unknown error
       logger.error('Unknown error calling AI service', { 
         error: error.message,
         stack: error.stack 
       });
       throw ApiError.internal('Failed to analyze message. Please try again.');
     }
+  }
+
+  /**
+   * Save scan history to database
+   */
+  async saveScanHistory(userId, message, scanResult) {
+    try {
+      const history = await prisma.scanHistory.create({
+        data: {
+          userId,
+          message,
+          isSpam: scanResult.is_spam,
+          confidence: scanResult.confidence,
+          prediction: scanResult.prediction,
+          details: scanResult.details || {}
+        }
+      });
+
+      logger.info('Scan history saved', { historyId: history.id, userId });
+
+      return history;
+    } catch (error) {
+      logger.error('Failed to save scan history', { error: error.message });
+      // Don't throw error, just log it - history save shouldn't fail the scan
+    }
+  }
+
+  /**
+   * Get scan history for user
+   */
+  async getScanHistory(userId, filters = {}) {
+    const { page = 1, limit = 20, isSpam } = filters;
+    const skip = (page - 1) * limit;
+
+    const where = {
+      userId,
+      ...(isSpam !== undefined && { isSpam: isSpam === 'true' || isSpam === true })
+    };
+
+    const [histories, total] = await Promise.all([
+      prisma.scanHistory.findMany({
+        where,
+        orderBy: { scannedAt: 'desc' },
+        skip,
+        take: parseInt(limit)
+      }),
+      prisma.scanHistory.count({ where })
+    ]);
+
+    return {
+      histories,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
+  }
+
+  /**
+   * Get scan history by ID
+   */
+  async getScanHistoryById(id, userId) {
+    const history = await prisma.scanHistory.findFirst({
+      where: {
+        id,
+        userId
+      }
+    });
+
+    if (!history) {
+      throw ApiError.notFound('Scan history not found');
+    }
+
+    return history;
+  }
+
+  /**
+   * Delete scan history
+   */
+  async deleteScanHistory(id, userId) {
+    const history = await prisma.scanHistory.findFirst({
+      where: {
+        id,
+        userId
+      }
+    });
+
+    if (!history) {
+      throw ApiError.notFound('Scan history not found');
+    }
+
+    await prisma.scanHistory.delete({
+      where: { id }
+    });
+
+    logger.info('Scan history deleted', { historyId: id, userId });
+
+    return { message: 'Scan history deleted successfully' };
+  }
+
+  /**
+   * Get scan statistics for user
+   */
+  async getScanStatistics(userId) {
+    const [totalScans, spamCount, hamCount] = await Promise.all([
+      prisma.scanHistory.count({ where: { userId } }),
+      prisma.scanHistory.count({ where: { userId, isSpam: true } }),
+      prisma.scanHistory.count({ where: { userId, isSpam: false } })
+    ]);
+
+    return {
+      totalScans,
+      spamCount,
+      hamCount,
+      spamPercentage: totalScans > 0 ? ((spamCount / totalScans) * 100).toFixed(2) : 0
+    };
   }
 
   /**

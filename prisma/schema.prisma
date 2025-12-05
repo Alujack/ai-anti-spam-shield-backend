@@ -1,0 +1,86 @@
+// This is your Prisma schema file
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String?
+  phone     String?
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  scanHistories ScanHistory[]
+  reports       Report[]
+
+  @@map("users")
+}
+
+model ScanHistory {
+  id         String   @id @default(uuid())
+  userId     String
+  message    String   @db.Text
+  isSpam     Boolean
+  confidence Float
+  prediction String
+  details    Json?
+  scannedAt  DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("scan_histories")
+  @@index([userId])
+  @@index([scannedAt])
+}
+
+model Report {
+  id          String       @id @default(uuid())
+  userId      String
+  messageText String       @db.Text
+  reportType  ReportType
+  description String?      @db.Text
+  status      ReportStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("reports")
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ReportType {
+  SPAM
+  PHISHING
+  SCAM
+  SUSPICIOUS
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  REJECTED
+}
+
