@@ -30,9 +30,9 @@ const scanText = async (req, res, next) => {
     // Call AI service to analyze message
     const result = await messageService.scanTextForSpam(message, userId);
 
-    logger.info('Spam scan completed', { 
+    logger.info('Spam scan completed', {
       isSpam: result.is_spam,
-      confidence: result.confidence 
+      confidence: result.confidence
     });
 
     res.status(200).json({
