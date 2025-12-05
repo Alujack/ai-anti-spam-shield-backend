@@ -1,4 +1,47 @@
 const messageService = require('../services/message.service');
+const ApiError = require('../utils/apiError');
+const logger = require('../utils/logger');
+
+/**
+ * Scan text for spam using AI model
+ */
+const scanText = async (req, res, next) => {
+  try {
+    const { message } = req.body;
+
+    // Validate input
+    if (!message) {
+      throw ApiError.badRequest('Message field is required');
+    }
+
+    if (typeof message !== 'string') {
+      throw ApiError.badRequest('Message must be a string');
+    }
+
+    if (message.trim().length === 0) {
+      throw ApiError.badRequest('Message cannot be empty');
+    }
+
+    logger.info('Scanning text for spam', { messageLength: message.length });
+
+    // Call AI service to analyze message
+    const result = await messageService.scanTextForSpam(message);
+
+    logger.info('Spam scan completed', { 
+      isSpam: result.is_spam,
+      confidence: result.confidence 
+    });
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Message scanned successfully',
+      data: result
+    });
+  } catch (error) {
+    logger.error('Error scanning text', { error: error.message });
+    next(error);
+  }
+};
 
 /**
  * Analyze a message for spam
@@ -67,6 +110,7 @@ const deleteMessage = async (req, res, next) => {
 };
 
 module.exports = {
+  scanText,
   analyzeMessage,
   getAllMessages,
   getMessageById,

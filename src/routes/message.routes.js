@@ -4,6 +4,7 @@ const messageController = require('../controllers/message.controller');
 const { authenticate } = require('../middlewares/auth');
 
 // Message routes
+router.post('/scan-text', messageController.scanText);
 router.post('/analyze', authenticate, messageController.analyzeMessage);
 router.get('/', authenticate, messageController.getAllMessages);
 router.get('/:id', authenticate, messageController.getMessageById);
