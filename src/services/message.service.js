@@ -11,6 +11,113 @@ const logger = require('../utils/logger');
 
 class MessageService {
   /**
+   * Scan voice for spam using AI model service
+   * @param {Buffer} audioBuffer - The audio file buffer
+   * @param {string} filename - The audio filename
+   * @param {string} userId - Optional user ID to save history
+   * @returns {Promise<Object>} - Spam detection result with transcription
+   */
+  async scanVoiceForSpam(audioBuffer, filename, userId = null) {
+    try {
+      const FormData = require('form-data');
+      const aiServiceUrl = `${config.ai.serviceUrl}/predict-voice`;
+      
+      logger.info('Calling AI voice service', { url: aiServiceUrl, filename });
+
+      // Create form data with audio file
+      const formData = new FormData();
+      formData.append('audio', audioBuffer, filename);
+
+      // Call the AI model service
+      const response = await axios.post(
+        aiServiceUrl,
+        formData,
+        {
+          headers: {
+            ...formData.getHeaders(),
+            ...(config.ai.apiKey && { 'Authorization': `Bearer ${config.ai.apiKey}` })
+          },
+          timeout: 60000, // 60 second timeout for voice processing
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity
+        }
+      );
+
+      // Validate response
+      if (!response.data) {
+        throw ApiError.internal('AI service returned empty response');
+      }
+
+      logger.info('AI voice service response received', { 
+        status: response.status,
+        transcribed: response.data.transcribed_text 
+      });
+
+      const result = {
+        is_spam: response.data.is_spam || response.data.prediction === 'spam',
+        confidence: response.data.confidence || response.data.probability || 0,
+        prediction: response.data.prediction || (response.data.is_spam ? 'spam' : 'ham'),
+        message: response.data.transcribed_text,
+        transcribed_text: response.data.transcribed_text,
+        timestamp: new Date().toISOString(),
+        ...(response.data.details && { details: response.data.details })
+      };
+
+      // Save to history if user is authenticated
+      if (userId) {
+        await this.saveScanHistory(userId, response.data.transcribed_text, result);
+      }
+
+      return result;
+
+    } catch (error) {
+      // Handle different types of errors
+      if (error.isOperational) {
+        throw error;
+      }
+
+      if (error.code === 'ECONNREFUSED') {
+        logger.error('AI service connection refused', { 
+          url: config.ai.serviceUrl 
+        });
+        throw ApiError.internal('AI service is unavailable. Please try again later.');
+      }
+
+      if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+        logger.error('AI service timeout', { error: error.message });
+        throw ApiError.internal('AI service request timed out. Please try again.');
+      }
+
+      if (error.response) {
+        logger.error('AI service error response', { 
+          status: error.response.status,
+          data: error.response.data 
+        });
+
+        const statusCode = error.response.status;
+        const errorMessage = error.response.data?.detail || 
+                           error.response.data?.message || 
+                           error.response.data?.error || 
+                           'AI service error';
+
+        if (statusCode === 400) {
+          throw ApiError.badRequest(`AI service error: ${errorMessage}`);
+        } else if (statusCode === 503) {
+          throw ApiError.internal('AI service is temporarily unavailable');
+        } else {
+          throw ApiError.internal(`AI service error: ${errorMessage}`);
+        }
+      }
+
+      logger.error('Unknown error calling AI voice service', { 
+        error: error.message,
+        stack: error.stack 
+      });
+      throw ApiError.internal('Failed to analyze voice message. Please try again.');
+    }
+  }
+
+  /**
    * Scan text for spam using AI model service
    * @param {string} messageText - The message text to scan
    * @param {string} userId - Optional user ID to save history

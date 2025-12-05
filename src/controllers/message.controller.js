@@ -3,6 +3,60 @@ const ApiError = require('../utils/apiError');
 const logger = require('../utils/logger');
 
 /**
+ * Scan voice for spam using AI model
+ */
+const scanVoice = async (req, res, next) => {
+  try {
+    // Check if file was uploaded
+    if (!req.file) {
+      throw ApiError.badRequest('Audio file is required');
+    }
+
+    const audioBuffer = req.file.buffer;
+    const filename = req.file.originalname;
+
+    // Validate file type
+    const allowedTypes = ['audio/wav', 'audio/mpeg', 'audio/mp3', 'audio/ogg', 'audio/flac', 'audio/x-wav', 'audio/webm'];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      throw ApiError.badRequest('Invalid audio format. Supported formats: WAV, MP3, OGG, FLAC, WEBM');
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (req.file.size > maxSize) {
+      throw ApiError.badRequest('Audio file too large. Maximum size is 10MB');
+    }
+
+    logger.info('Scanning voice for spam', { 
+      filename: filename,
+      size: req.file.size,
+      mimetype: req.file.mimetype 
+    });
+
+    // Get userId if user is authenticated (optional)
+    const userId = req.user?.id || null;
+
+    // Call AI service to analyze voice message
+    const result = await messageService.scanVoiceForSpam(audioBuffer, filename, userId);
+
+    logger.info('Voice spam scan completed', {
+      isSpam: result.is_spam,
+      confidence: result.confidence,
+      transcribed: result.transcribed_text
+    });
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Voice message scanned successfully',
+      data: result
+    });
+  } catch (error) {
+    logger.error('Error scanning voice', { error: error.message });
+    next(error);
+  }
+};
+
+/**
  * Scan text for spam using AI model
  */
 const scanText = async (req, res, next) => {
@@ -193,6 +247,7 @@ const deleteMessage = async (req, res, next) => {
 
 module.exports = {
   scanText,
+  scanVoice,
   getScanHistory,
   getScanHistoryById,
   deleteScanHistory,
