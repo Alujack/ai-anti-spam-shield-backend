@@ -1,0 +1,251 @@
+// Enhanced Database Schema for Cybersecurity Platform
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Enhanced User Model
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  name          String?
+  role          Role      @default(USER)
+  isActive      Boolean   @default(true)
+  lastLogin     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  scanHistory   ScanHistory[]
+  reports       Report[]
+  incidents     Incident[]
+  sessions      Session[]
+}
+
+enum Role {
+  USER
+  ADMIN
+  ANALYST
+}
+
+// Threat Detection Model
+model Threat {
+  id              String          @id @default(uuid())
+  threatType      ThreatType
+  severity        Severity
+  source          String?
+  sourceType      SourceType
+  content         String?
+  detectionMethod DetectionMethod
+  confidenceScore Float
+  status          ThreatStatus    @default(DETECTED)
+  detectedAt      DateTime        @default(now())
+  resolvedAt      DateTime?
+  resolvedBy      String?
+  
+  // Relations
+  incidents       Incident[]
+  networkEvents   NetworkEvent[]
+  fileScans       FileScan[]
+  
+  @@index([threatType])
+  @@index([severity])
+  @@index([status])
+  @@index([detectedAt])
+}
+
+enum ThreatType {
+  SPAM
+  PHISHING
+  MALWARE
+  INTRUSION
+  DDoS
+  BRUTE_FORCE
+  DATA_EXFILTRATION
+  UNAUTHORIZED_ACCESS
+  SOCIAL_ENGINEERING
+  SUSPICIOUS_BEHAVIOR
+  OTHER
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum SourceType {
+  TEXT
+  VOICE
+  NETWORK
+  FILE
+  BEHAVIOR
+  SYSTEM_LOG
+}
+
+enum DetectionMethod {
+  ML_MODEL
+  RULE_BASED
+  SIGNATURE
+  ANOMALY
+  THREAT_INTELLIGENCE
+  HYBRID
+}
+
+enum ThreatStatus {
+  DETECTED
+  INVESTIGATING
+  CONTAINED
+  RESOLVED
+  FALSE_POSITIVE
+}
+
+// Network Events
+model NetworkEvent {
+  id            String    @id @default(uuid())
+  sourceIp      String?
+  destIp        String?
+  sourcePort    Int?
+  destPort      Int?
+  protocol      String?
+  packetSize    Int?
+  flags         String?
+  isSuspicious  Boolean   @default(false)
+  threatId      String?
+  threat        Threat?   @relation(fields: [threatId], references: [id])
+  timestamp     DateTime  @default(now())
+  
+  @@index([sourceIp])
+  @@index([destIp])
+  @@index([timestamp])
+  @@index([isSuspicious])
+}
+
+// File Scans
+model FileScan {
+  id            String      @id @default(uuid())
+  fileHash      String      @index
+  fileName      String?
+  fileType      String?
+  fileSize      BigInt?
+  scanResult    ScanResult
+  threatId      String?
+  threat        Threat?     @relation(fields: [threatId], references: [id])
+  scannedAt     DateTime    @default(now())
+  scanDetails   Json?
+  
+  @@index([fileHash])
+  @@index([scanResult])
+}
+
+enum ScanResult {
+  CLEAN
+  SUSPICIOUS
+  MALICIOUS
+}
+
+// Incidents
+model Incident {
+  id             String          @id @default(uuid())
+  title          String
+  description    String?
+  severity       Severity
+  status         IncidentStatus  @default(OPEN)
+  assignedTo     String?
+  userId         String?
+  user           User?           @relation(fields: [userId], references: [id])
+  threatId       String?
+  threat         Threat?         @relation(fields: [threatId], references: [id])
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  resolvedAt     DateTime?
+  
+  @@index([status])
+  @@index([severity])
+  @@index([createdAt])
+}
+
+enum IncidentStatus {
+  OPEN
+  INVESTIGATING
+  CONTAINED
+  RESOLVED
+  CLOSED
+}
+
+// Scan History
+model ScanHistory {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  scanType      ScanType
+  content       String?
+  isSpam        Boolean
+  confidence    Float
+  details       Json?
+  scannedAt     DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([scanType])
+  @@index([isSpam])
+  @@index([scannedAt])
+}
+
+enum ScanType {
+  TEXT
+  VOICE
+  FILE
+  NETWORK
+  BEHAVIOR
+}
+
+// Reports
+model Report {
+  id            String        @id @default(uuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  reportType    ReportType
+  description   String?
+  status        ReportStatus  @default(PENDING)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+}
+
+enum ReportType {
+  SPAM
+  PHISHING
+  SCAM
+  SUSPICIOUS
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  REJECTED
+}
+
+// User Sessions
+model Session {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  token         String    @unique
+  ipAddress     String?
+  userAgent     String?
+  expiresAt     DateTime
+  createdAt     DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([token])
+}
