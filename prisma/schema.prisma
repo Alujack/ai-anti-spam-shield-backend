@@ -21,8 +21,9 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  scanHistories ScanHistory[]
-  reports       Report[]
+  scanHistories         ScanHistory[]
+  reports               Report[]
+  phishingScanHistories PhishingScanHistory[]
 
   @@map("users")
 }
@@ -62,4 +63,28 @@ model Report {
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+}
+
+model PhishingScanHistory {
+  id            String   @id @default(uuid())
+  userId        String
+  inputText     String
+  inputUrl      String?
+  isPhishing    Boolean
+  confidence    Float
+  phishingType  String   // EMAIL, SMS, URL, NONE
+  threatLevel   String   // CRITICAL, HIGH, MEDIUM, LOW, NONE
+  indicators    String   // JSON array of detected indicators
+  urlsAnalyzed  String?  // JSON array of URL analysis results
+  brandDetected String?  // Detected brand impersonation
+  scannedAt     DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("phishing_scan_histories")
+  @@index([userId])
+  @@index([scannedAt])
+  @@index([phishingType])
+  @@index([threatLevel])
 }

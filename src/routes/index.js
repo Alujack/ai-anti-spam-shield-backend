@@ -4,11 +4,13 @@ const router = express.Router();
 const messageRoutes = require('./message.routes');
 const userRoutes = require('./user.routes');
 const reportRoutes = require('./report.routes');
+const phishingRoutes = require('./phishing.routes');
 
 // Mount routes
 router.use('/messages', messageRoutes);
 router.use('/users', userRoutes);
 router.use('/reports', reportRoutes);
+router.use('/phishing', phishingRoutes);
 
 // API info endpoint
 router.get('/', (req, res) => {
@@ -19,7 +21,8 @@ router.get('/', (req, res) => {
     endpoints: {
       messages: '/api/v1/messages',
       users: '/api/v1/users',
-      reports: '/api/v1/reports'
+      reports: '/api/v1/reports',
+      phishing: '/api/v1/phishing'
     }
   });
 });
