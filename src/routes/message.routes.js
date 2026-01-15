@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const messageController = require('../controllers/message.controller');
-const { authenticate } = require('../middlewares/auth');
+const { authenticate, optionalAuthenticate } = require('../middlewares/auth');
 const upload = require('../middlewares/upload');
 
-// Public routes
-router.post('/scan-text', messageController.scanText);
-router.post('/scan-voice', upload.single('audio'), messageController.scanVoice);
+// Public routes with optional authentication (to save history if logged in)
+router.post('/scan-text', optionalAuthenticate, messageController.scanText);
+router.post('/scan-voice', optionalAuthenticate, upload.single('audio'), messageController.scanVoice);
 
 // Protected routes
 router.get('/history', authenticate, messageController.getScanHistory);

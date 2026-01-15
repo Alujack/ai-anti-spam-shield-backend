@@ -16,9 +16,16 @@ const scanVoice = async (req, res, next) => {
     const filename = req.file.originalname;
 
     // Validate file type
-    const allowedTypes = ['audio/wav', 'audio/mpeg', 'audio/mp3', 'audio/ogg', 'audio/flac', 'audio/x-wav', 'audio/webm'];
+    const allowedTypes = [
+      'audio/wav', 'audio/x-wav',
+      'audio/mpeg', 'audio/mp3',
+      'audio/ogg',
+      'audio/flac',
+      'audio/webm',
+      'audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac'  // M4A/AAC formats
+    ];
     if (!allowedTypes.includes(req.file.mimetype)) {
-      throw ApiError.badRequest('Invalid audio format. Supported formats: WAV, MP3, OGG, FLAC, WEBM');
+      throw ApiError.badRequest('Invalid audio format. Supported formats: WAV, MP3, OGG, FLAC, WEBM, M4A, AAC');
     }
 
     // Validate file size (max 10MB)
