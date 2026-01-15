@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -16,7 +16,7 @@ model User {
   password  String
   name      String?
   phone     String?
-  role      Role     @default(USER)
+  role      String   @default("USER")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -30,11 +30,11 @@ model User {
 model ScanHistory {
   id         String   @id @default(uuid())
   userId     String
-  message    String   @db.Text
+  message    String
   isSpam     Boolean
   confidence Float
   prediction String
-  details    Json?
+  details    String?
   scannedAt  DateTime @default(now())
 
   // Relations
@@ -46,14 +46,14 @@ model ScanHistory {
 }
 
 model Report {
-  id          String       @id @default(uuid())
+  id          String   @id @default(uuid())
   userId      String
-  messageText String       @db.Text
-  reportType  ReportType
-  description String?      @db.Text
-  status      ReportStatus @default(PENDING)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  messageText String
+  reportType  String
+  description String?
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -63,24 +63,3 @@ model Report {
   @@index([status])
   @@index([createdAt])
 }
-
-enum Role {
-  USER
-  ADMIN
-}
-
-enum ReportType {
-  SPAM
-  PHISHING
-  SCAM
-  SUSPICIOUS
-  OTHER
-}
-
-enum ReportStatus {
-  PENDING
-  REVIEWED
-  RESOLVED
-  REJECTED
-}
-
